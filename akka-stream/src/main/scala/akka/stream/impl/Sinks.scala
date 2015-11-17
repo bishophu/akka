@@ -142,6 +142,62 @@ private[akka] final class HeadOptionSink[In](val attributes: Attributes, shape: 
 
 /**
  * INTERNAL API
+ */
+private[akka] object LastSink {
+  final class LastOptionSinkSubscriber[In] extends Subscriber[In] {
+    private[this] var prev: In = null.asInstanceOf[In]
+    private[this] var subscription: Subscription = null
+    private[this] val promise: Promise[Option[In]] = Promise[Option[In]]()
+    def future: Future[Option[In]] = promise.future
+    override def onSubscribe(s: Subscription): Unit = {
+      ReactiveStreamsCompliance.requireNonNullSubscription(s)
+      if (subscription ne null) s.cancel()
+      else {
+        subscription = s
+        s.request(Long.MaxValue)
+      }
+    }
+
+    override def onNext(elem: In): Unit = {
+      ReactiveStreamsCompliance.requireNonNullElement(elem)
+      prev = elem
+    }
+
+    override def onError(t: Throwable): Unit = {
+      ReactiveStreamsCompliance.requireNonNullException(t)
+      promise.tryFailure(t)
+      subscription = null
+    }
+
+    override def onComplete(): Unit = {
+      promise.trySuccess(Option(prev))
+      prev = null.asInstanceOf[In]
+      subscription = null
+    }
+  }
+
+}
+
+/**
+ * INTERNAL API
+ * Holds a [[scala.concurrent.Future]] that will be fulfilled with the last
+ * element that is signaled to this stream (wrapped in a [[Some]]),
+ * which can be either an element (after which the upstream subscription is canceled),
+ * an error condition (putting the Future into the corresponding failed state) or
+ * the end-of-stream (yielding [[None]]).
+ */
+private[akka] final class LastOptionSink[In](val attributes: Attributes, shape: SinkShape[In]) extends SinkModule[In, Future[Option[In]]](shape) {
+  override def create(context: MaterializationContext) = {
+    val sub = new LastSink.LastOptionSinkSubscriber[In]
+    (sub, sub.future)
+  }
+  override protected def newInstance(shape: SinkShape[In]): SinkModule[In, Future[Option[In]]] = new LastOptionSink[In](attributes, shape)
+  override def withAttributes(attr: Attributes): Module = new LastOptionSink[In](attr, amendShape(attr))
+  override def toString: String = "LastOptionSink"
+}
+
+/**
+ * INTERNAL API
  * Attaches a subscriber to this stream which will just discard all received
  * elements.
  */
