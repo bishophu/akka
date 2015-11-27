@@ -22,14 +22,14 @@ Akka HTTP also predefines a number of helpful aliases for the types of marshalle
 
 Contrary to what you might initially expect ``Marshaller[A, B]`` is not a plain function ``A => B`` but rather
 essentially a function ``A => Future[List[Marshalling[B]]]``.
-Let's dissect this rather complicated looking signature piece by piece to understand what marshallers are designed this
+Let's dissect this rather complicated looking signature piece by piece to understand why marshallers are designed this
 way.
 Given an instance of type ``A`` a ``Marshaller[A, B]`` produces:
 
 1. A ``Future``: This is probably quite clear. Marshallers are not required to synchronously produce a result, so instead
 they return a future, which allows for asynchronicity in the marshalling process.
 
-2. of ``List``: Rather than only a single target representation for ``A`` marshallers can offer several ones. Which
+2. of ``List``: Rather than only a single target representation for ``A``, marshallers can offer several ones. Which
 one will be rendered onto the wire in the end is decided by content negotiation.
 For example, the ``ToEntityMarshaller[OrderConfirmation]`` might offer a JSON as well as an XML representation.
 The client can decide through the addition of an ``Accept`` request header which one is preferred. If the client doesn't
